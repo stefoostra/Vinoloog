@@ -1,0 +1,94 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Dec 18 13:34:06 2023
+
+@author: stefo
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sb
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn import metrics
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import ConfusionMatrixDisplay
+
+import warnings
+warnings.filterwarnings('ignore')
+
+#eerste 5 rijen van de dataset
+df = pd.read_excel(r"C:\Users\stefo\Downloads\WineQuality.xlsx")
+print(df.head())
+
+#type van de data per kolom
+print(df.info())
+
+#statistieken
+print(df.describe())
+
+#nul waarden per kolom
+print(df.isnull().sum())
+
+#nul waarden vervangen door gemiddeldes
+for col in df.columns:
+    if df[col].isnull().sum() > 0:
+        df[col].fillna(df[col].mean(), inplace=True)
+
+#histogrammem plotten
+df.hist(bins=20, figsize=(10, 10))
+plt.show()
+
+#staafdiaram over de kwaliteit
+plt.bar(df['quality'], df['alcohol'])
+plt.xlabel('quality')
+plt.ylabel('alcohol')
+plt.show()
+
+#kijken naar correlatie
+plt.figure(figsize=(12, 12))
+sb.heatmap(df.corr() > 0.7, annot=True, cbar=False)
+plt.show()
+
+#total sulfur dioxide verwijderen
+df = df.drop('total sulfur dioxide', axis=1)
+
+#kwaliteit verdelen in twee groepen
+df['best quality'] = [1 if x > 5 else 0 for x in df.quality]
+
+#getal koppelen aan type wijn
+df.replace({'White Wine': 1, 'Red Wine': 0}, inplace=True)
+
+#model selection
+features = df.drop(['quality', 'best quality'], axis=1)
+target = df['best quality']
+
+xtrain, xtest, ytrain, ytest = train_test_split(
+	features, target, test_size=0.2, random_state=40)
+
+xtrain.shape, xtest.shape
+
+#normalisen van data helpt met een stabiel en snel trainen van het model
+norm = MinMaxScaler()
+xtrain = norm.fit_transform(xtrain)
+xtest = norm.transform(xtest)
+
+#trainen
+models = [LogisticRegression(), XGBClassifier(), SVC(kernel='rbf')]
+
+for i in range(3):
+	models[i].fit(xtrain, ytrain)
+
+	print(f'{models[i]} : ')
+	print('Training Accuracy : ', metrics.roc_auc_score(ytrain, models[i].predict(xtrain)))
+	print('Validation Accuracy : ', metrics.roc_auc_score(
+		ytest, models[i].predict(xtest)))
+	print()
+
+#classification report voor het beste model
+print(metrics.classification_report(ytest,
+									models[1].predict(xtest)))
